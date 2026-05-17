@@ -1,0 +1,15 @@
+body {
+  margin: 0;
+  background: #050505;
+  color: #d6ffd6;
+  font-family: Consolas, monospace;
+}
+
+#app {
+  padding: 24px;
+}
+
+pre {
+  font-size: 18px;
+  line-height: 1.25;
+}
