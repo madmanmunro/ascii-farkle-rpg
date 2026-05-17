@@ -2,8 +2,14 @@ import "./style.css";
 import { hasScoringDice, rollDice, scoreDice } from "./dice/farkle";
 import { createPlayer } from "./player/player";
 import { renderGame } from "./ui/render";
-import { isBlocked, worldMap } from "./world/world";
+import {
+  createTownMap,
+  isBlocked,
+  setWorldMap,
+  worldMap,
+} from "./world/world";
 import type { Encounter } from "./encounters/encounter";
+import type { WorldMode } from "./world/tile";
 
 export type ExchangeState = {
   type: "barter" | "combat";
@@ -20,10 +26,18 @@ export type ExchangeState = {
   bankedScore: number;
 };
 
+type Position = {
+  x: number;
+  y: number;
+};
+
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const player = createPlayer();
 
 let exchange: ExchangeState | null = null;
+let worldMode: WorldMode = "overworld";
+let overworldMap = worldMap;
+let overworldPosition = { x: player.x, y: player.y };
 
 const log: string[] = [
   "You enter a classic RPG overworld.",
@@ -31,7 +45,41 @@ const log: string[] = [
 ];
 
 function draw(): void {
-  app.innerHTML = `<pre>${renderGame(player, log, exchange)}</pre>`;
+  app.innerHTML = renderGame(player, log, exchange);
+}
+
+function isWalkablePosition(x: number, y: number): boolean {
+  return !isBlocked(x, y);
+}
+
+function hasOpenAdjacentTile(x: number, y: number): boolean {
+  return (
+    isWalkablePosition(x, y - 1) ||
+    isWalkablePosition(x, y + 1) ||
+    isWalkablePosition(x - 1, y) ||
+    isWalkablePosition(x + 1, y)
+  );
+}
+
+function findSafeStartingPosition(): Position {
+  for (let y = 0; y < worldMap.length; y++) {
+    for (let x = 0; x < worldMap[y].length; x++) {
+      if (isWalkablePosition(x, y) && hasOpenAdjacentTile(x, y)) {
+        return { x, y };
+      }
+    }
+  }
+
+  return { x: 1, y: 1 };
+}
+
+function placePlayerAtSafeStart(): void {
+  const safeStart = findSafeStartingPosition();
+
+  player.x = safeStart.x;
+  player.y = safeStart.y;
+
+  overworldPosition = { x: player.x, y: player.y };
 }
 
 function movePlayer(dx: number, dy: number): void {
@@ -60,6 +108,31 @@ function movePlayer(dx: number, dy: number): void {
 function describeCurrentTile(): void {
   const tile = worldMap[player.y][player.x];
 
+  if (tile.type === "exit") {
+    log.push("You see the town exit. Press E to leave.");
+    return;
+  }
+
+  if (tile.type === "trader") {
+    log.push("A trader waits here. Press E to interact.");
+    return;
+  }
+
+  if (tile.type === "tavern") {
+    log.push("You hear noise from the tavern. Press E to enter.");
+    return;
+  }
+
+  if (tile.type === "well") {
+    log.push("An old well descends into darkness. Press E to inspect.");
+    return;
+  }
+
+  if (tile.type === "building") {
+    log.push("A small building stands here. Press E to enter.");
+    return;
+  }
+
   if (tile.type === "town") {
     log.push("You arrive at a town. Press E to enter.");
     return;
@@ -85,6 +158,11 @@ function describeCurrentTile(): void {
     return;
   }
 
+  if (tile.type === "road") {
+    log.push("You walk along the town road.");
+    return;
+  }
+
   log.push("You travel across the open plains.");
 }
 
@@ -97,14 +175,58 @@ function interactWithTile(): void {
     return;
   }
 
-  if (tile.type === "town") {
-    log.push("Town entry system coming next: streets, tavern, trader, well, and buildings.");
+  if (worldMode === "overworld" && tile.type === "town") {
+    overworldPosition = { x: player.x, y: player.y };
+    overworldMap = worldMap;
+    setWorldMap(createTownMap());
+    worldMode = "town";
+
+    player.x = Math.floor(worldMap[0].length / 2);
+    player.y = worldMap.length - 3;
+
+    log.push("You enter town. Visit the trader, tavern, buildings, or well.");
     draw();
     return;
   }
 
-  if (tile.type === "cave") {
-    log.push("Dungeon crawler system coming next: rooms, monsters, loot, stairs, and exits.");
+  if (worldMode === "town" && tile.type === "exit") {
+    setWorldMap(overworldMap);
+    worldMode = "overworld";
+
+    player.x = overworldPosition.x;
+    player.y = overworldPosition.y;
+
+    log.push("You leave town and return to the overworld.");
+    draw();
+    return;
+  }
+
+  if (worldMode === "town" && tile.type === "trader") {
+    log.push("You approach the trader. Bartering system will connect here next.");
+    draw();
+    return;
+  }
+
+  if (worldMode === "town" && tile.type === "tavern") {
+    log.push("You enter the tavern. Rumors, disputes, and quests will connect here next.");
+    draw();
+    return;
+  }
+
+  if (worldMode === "town" && tile.type === "well") {
+    log.push("You peer into the well. Dungeon descent will connect here next.");
+    draw();
+    return;
+  }
+
+  if (worldMode === "town" && tile.type === "building") {
+    log.push("You enter a quiet building. Interior maps will connect here later.");
+    draw();
+    return;
+  }
+
+  if (worldMode === "overworld" && tile.type === "cave") {
+    log.push("Dungeon crawler system coming next.");
     draw();
     return;
   }
@@ -142,7 +264,12 @@ function rollForExchange(): void {
     return;
   }
 
-  log.push(`Rolled: ${exchange.currentRoll.map((die, index) => `${index + 1}:${die}`).join("  ")}`);
+  log.push(
+    `Rolled: ${exchange.currentRoll
+      .map((die, index) => `${index + 1}:${die}`)
+      .join("  ")}`
+  );
+
   log.push("Choose dice with number keys, then press B to bank.");
   draw();
 }
@@ -152,12 +279,17 @@ function toggleHeldDie(index: number): void {
   if (index < 0 || index >= exchange.currentRoll.length) return;
 
   if (exchange.heldIndexes.includes(index)) {
-    exchange.heldIndexes = exchange.heldIndexes.filter((heldIndex) => heldIndex !== index);
+    exchange.heldIndexes = exchange.heldIndexes.filter(
+      (heldIndex) => heldIndex !== index
+    );
   } else {
     exchange.heldIndexes.push(index);
   }
 
-  exchange.heldDice = exchange.heldIndexes.map((heldIndex) => exchange!.currentRoll[heldIndex]);
+  exchange.heldDice = exchange.heldIndexes.map(
+    (heldIndex) => exchange!.currentRoll[heldIndex]
+  );
+
   draw();
 }
 
@@ -181,7 +313,9 @@ function bankHeldDice(): void {
   exchange.bankedScore += heldResult.score;
   exchange.diceRemaining -= exchange.heldDice.length;
 
-  log.push(`Banked ${heldResult.score}. Total: ${exchange.bankedScore}/${exchange.threshold}.`);
+  log.push(
+    `Banked ${heldResult.score}. Total: ${exchange.bankedScore}/${exchange.threshold}.`
+  );
 
   if (exchange.bankedScore >= exchange.threshold) {
     winExchange();
@@ -263,4 +397,6 @@ window.addEventListener("keydown", (event) => {
   if (key === "e") interactWithTile();
 });
 
+placePlayerAtSafeStart();
+describeCurrentTile();
 draw();

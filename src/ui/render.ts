@@ -1,43 +1,90 @@
 import type { Player } from "../player/player";
 import type { ExchangeState } from "../main";
-import { getTileSymbol, worldMap } from "../world/world";
+import { getTileColorClass, getTileSymbol, worldMap } from "../world/world";
 
 export function renderGame(
   player: Player,
   log: string[],
   exchange: ExchangeState | null
 ): string {
-  let display = "";
+  let mapDisplay = "";
 
   for (let y = 0; y < worldMap.length; y++) {
     for (let x = 0; x < worldMap[y].length; x++) {
-      display += player.x === x && player.y === y ? "@" : getTileSymbol(worldMap[y][x]);
+      const tile = worldMap[y][x];
+
+      if (player.x === x && player.y === y) {
+        mapDisplay += `<span class="tile-player">@</span>`;
+      } else {
+        mapDisplay += `<span class="${getTileColorClass(tile)}">${getTileSymbol(tile)}</span>`;
+      }
     }
 
-    display += "\n";
+    mapDisplay += "\n";
   }
 
-  display += `\nHP: ${player.hp}/${player.maxHp}`;
-  display += `\nGold: ${player.gold}`;
+  const exchangeDisplay = exchange
+    ? `
++--------------------------------+
+|            EXCHANGE            |
++--------------------------------+
+| Opponent: ${exchange.name}
+| Type: ${exchange.type}
+| Level: ${exchange.level}
+| Threshold: ${exchange.threshold}
+| Banked: ${exchange.bankedScore}/${exchange.threshold}
+| Dice Remaining: ${exchange.diceRemaining}
+| Roll: ${exchange.currentRoll.map((die, index) => `${index + 1}:${die}`).join(" ")}
+| Held: ${exchange.heldDice.join(", ") || "None"}
++--------------------------------+
+| 1-6 Hold/Unhold | B Bank       |
++--------------------------------+`
+    : `
++--------------------------------+
+|            CONTROLS            |
++--------------------------------+
+| W/A/S/D - Move                 |
+| E       - Interact             |
++--------------------------------+`;
 
-  if (exchange) {
-    display += `\n\nEXCHANGE ACTIVE`;
-    display += `\nOpponent: ${exchange.name}`;
-    display += `\nType: ${exchange.type}`;
-    display += `\nLevel: ${exchange.level}`;
-    display += `\nThreshold: ${exchange.threshold}`;
-    display += `\nBanked Score: ${exchange.bankedScore}/${exchange.threshold}`;
-    display += `\nDice Remaining: ${exchange.diceRemaining}`;
-    display += `\nCurrent Roll: ${exchange.currentRoll.map((die, index) => `${index + 1}:${die}`).join("  ")}`;
-    display += `\nHeld Dice: ${exchange.heldDice.join(", ") || "None"}`;
-    display += `\n\n1-6 = hold/unhold die`;
-    display += `\nB = bank held dice`;
-  } else {
-    display += `\n\nControls: W/A/S/D move, E interact`;
-    display += `\nLegend: @ you, ~ ocean, . plains, F forest, D desert, ^ mountain, ≈ river, T town, C cave`;
-  }
+  return `
+<div class="game-layout">
+  <pre class="map-panel">${mapDisplay}</pre>
 
-  display += `\n\nLog:\n${log.slice(-12).join("\n")}`;
+  <div class="side-panel">
+<pre class="box">
++--------------------------------+
+|            WORLD MAP           |
++--------------------------------+
+| <span class="tile-ocean">#</span> Ocean   Dark Navy Blue       |
+| <span class="tile-river">~</span> River   Light Blue           |
+| <span class="tile-plains">,</span> Plains  Light Olive Green    |
+| <span class="tile-desert">.</span> Desert  Orange               |
+| <span class="tile-forest">Y</span> Forest  Hunter Green         |
+| <span class="tile-mountain">A</span> Mountain Grey               |
+| <span class="tile-town">T</span> Town    White                |
+| <span class="tile-cave">n</span> Cave    White                |
+| <span class="tile-player">@</span> You     White                |
++--------------------------------+
+</pre>
 
-  return display;
+<pre class="box">
++--------------------------------+
+| HP: ${player.hp}/${player.maxHp}
+| Gold: ${player.gold}
++--------------------------------+
+</pre>
+
+<pre class="box">${exchangeDisplay}</pre>
+
+<pre class="box">
++--------------------------------+
+|              LOG               |
++--------------------------------+
+${log.slice(-8).map((entry) => `| ${entry}`).join("\n")}
++--------------------------------+
+</pre>
+  </div>
+</div>
+`;
 }
