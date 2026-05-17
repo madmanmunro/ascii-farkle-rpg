@@ -3,10 +3,14 @@ import { hasScoringDice, rollDice, scoreDice } from "./dice/farkle";
 import { createPlayer } from "./player/player";
 import { renderGame } from "./ui/render";
 import { isBlocked, worldMap } from "./world/world";
+import type { Encounter } from "./encounters/encounter";
 
 export type ExchangeState = {
   type: "barter" | "combat";
+  name: string;
+  level: number;
   threshold: number;
+  reward: number;
   damageOnFail: number;
   goldLossOnFail: number;
   diceRemaining: number;
@@ -22,8 +26,8 @@ const player = createPlayer();
 let exchange: ExchangeState | null = null;
 
 const log: string[] = [
-  "You enter the open road.",
-  "T = trader, M = monster, # = wall, @ = you.",
+  "You enter a procedurally generated open world.",
+  "M = monster, T = trader, # = wall, @ = you.",
 ];
 
 function draw(): void {
@@ -49,12 +53,16 @@ function movePlayer(dx: number, dy: number): void {
   player.x = nextX;
   player.y = nextY;
 
-  const tile = worldMap[player.y][player.x];
+  const encounter = worldMap[player.y][player.x].encounter;
 
-  if (tile === "T") {
-    log.push("You meet a trader. Press R to start bartering.");
-  } else if (tile === "M") {
-    log.push("A hostile creature blocks your path. Press R to fight.");
+  if (encounter?.type === "trader") {
+    log.push(
+      `You meet ${encounter.name}, a level ${encounter.level} trader. Threshold: ${encounter.threshold}. Press R to barter.`
+    );
+  } else if (encounter?.type === "monster") {
+    log.push(
+      `You encounter ${encounter.name}, a level ${encounter.level} monster. Threshold: ${encounter.threshold}. Press R to fight.`
+    );
   } else {
     log.push("You travel onward.");
   }
@@ -63,7 +71,7 @@ function movePlayer(dx: number, dy: number): void {
 }
 
 function startExchange(): void {
-  const tile = worldMap[player.y][player.x];
+  const encounter = worldMap[player.y][player.x].encounter;
 
   if (exchange) {
     log.push("An exchange is already active.");
@@ -71,30 +79,32 @@ function startExchange(): void {
     return;
   }
 
-  if (tile === "T") {
-    exchange = createExchange("barter", 500);
-    log.push("Barter started. Bank enough dice points to meet 500.");
-    rollForExchange();
+  if (!encounter) {
+    log.push("There is nothing to resolve here.");
+    draw();
     return;
   }
 
-  if (tile === "M") {
-    exchange = createExchange("combat", 400);
-    log.push("Combat started. Bank enough dice points to meet 400.");
-    rollForExchange();
-    return;
-  }
+  exchange = createExchange(encounter);
 
-  log.push("There is nothing to resolve here.");
-  draw();
+  log.push(
+    `${exchange.type === "barter" ? "Barter" : "Combat"} started against ${exchange.name}.`
+  );
+
+  log.push(`Bank ${exchange.threshold} points before you farkle.`);
+
+  rollForExchange();
 }
 
-function createExchange(type: "barter" | "combat", threshold: number): ExchangeState {
+function createExchange(encounter: Encounter): ExchangeState {
   return {
-    type,
-    threshold,
-    damageOnFail: type === "combat" ? 4 : 0,
-    goldLossOnFail: type === "barter" ? 5 : 0,
+    type: encounter.type === "trader" ? "barter" : "combat",
+    name: encounter.name,
+    level: encounter.level,
+    threshold: encounter.threshold,
+    reward: encounter.reward,
+    damageOnFail: encounter.type === "monster" ? 3 + encounter.level : 0,
+    goldLossOnFail: encounter.type === "trader" ? 3 + encounter.level : 0,
     diceRemaining: 6,
     currentRoll: [],
     heldIndexes: [],
@@ -117,7 +127,10 @@ function rollForExchange(): void {
     return;
   }
 
-  log.push(`Rolled: ${exchange.currentRoll.map((die, index) => `${index + 1}:${die}`).join("  ")}`);
+  log.push(
+    `Rolled: ${exchange.currentRoll.map((die, index) => `${index + 1}:${die}`).join("  ")}`
+  );
+
   log.push("Choose dice with number keys, then press B to bank.");
   draw();
 }
@@ -164,9 +177,7 @@ function bankHeldDice(): void {
   exchange.bankedScore += heldResult.score;
   exchange.diceRemaining -= exchange.heldDice.length;
 
-  log.push(
-    `Banked ${heldResult.score}. Total: ${exchange.bankedScore}/${exchange.threshold}.`
-  );
+  log.push(`Banked ${heldResult.score}. Total: ${exchange.bankedScore}/${exchange.threshold}.`);
 
   if (exchange.bankedScore >= exchange.threshold) {
     winExchange();
@@ -189,18 +200,16 @@ function winExchange(): void {
   const tile = worldMap[player.y][player.x];
 
   if (exchange.type === "barter") {
-    const profit = Math.floor(exchange.bankedScore / 100);
-    player.gold += profit;
-    log.push(`Barter won. You gain ${profit} gold.`);
+    player.gold += exchange.reward;
+    log.push(`Barter won against ${exchange.name}. You gain ${exchange.reward} gold.`);
   }
 
   if (exchange.type === "combat") {
-    log.push("Combat won. Monster defeated.");
-    if (tile === "M") {
-      worldMap[player.y][player.x] = ".";
-    }
+    player.gold += exchange.reward;
+    log.push(`${exchange.name} defeated. You loot ${exchange.reward} gold.`);
   }
 
+  tile.encounter = undefined;
   exchange = null;
   draw();
 }
