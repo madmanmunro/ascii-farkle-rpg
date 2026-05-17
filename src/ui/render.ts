@@ -30,12 +30,11 @@ export function renderGame(
     display += `\nDice Remaining: ${exchange.diceRemaining}`;
     display += `\nCurrent Roll: ${exchange.currentRoll.map((die, index) => `${index + 1}:${die}`).join("  ")}`;
     display += `\nHeld Dice: ${exchange.heldDice.join(", ") || "None"}`;
-    display += `\n\nControls During Exchange:`;
-    display += `\n1-6 = hold/unhold die`;
-    display += `\nB = bank held dice and continue`;
+    display += `\n\n1-6 = hold/unhold die`;
+    display += `\nB = bank held dice`;
   } else {
-    display += `\n\nControls: W/A/S/D move, R start encounter`;
-    display += `\nLegend: @ = you, # = wall, . = open, M = monster, T = trader`;
+    display += `\n\nControls: W/A/S/D move, E interact`;
+    display += `\nLegend: @ you, ~ ocean, . plains, F forest, D desert, ^ mountain, ≈ river, T town, C cave`;
   }
 
   display += `\n\nLog:\n${log.slice(-12).join("\n")}`;
