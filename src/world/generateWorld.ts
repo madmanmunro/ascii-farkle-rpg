@@ -1,70 +1,48 @@
 import type { WorldTile } from "./tile";
 
-function randomChance(chance: number): boolean {
-  return Math.random() < chance;
+const worldTemplate = [
+  "##################################################",
+  "##################AAAAAAAAAAAAAAAA################",
+  "###############AAAYYYYYYYYYY,,,AAA################",
+  "##############A,,T,Y,~~.,,,Y,,Y,,A################",
+  "#############A,,.,,,Y~YYYYYYY,T,YA################",
+  "############A,Y,Y,Y,,~Y,,Y,,,,,Y,,A###############",
+  "###########A,,n,,Y,,Y~YYY,,Y,,,.,YA###############",
+  "###########AAAY,,,,.~,,.,,Y,Y,,,.,AA##############",
+  "##############Y,Y,.~,,Y,Y,Y,.,Y,T,AA##############",
+  "##############,,Y,T~~.,,Y,Y,Y,.,,,AA##############",
+  "###############,,,,,Y~~~.,.,,,.,,AA###############",
+  "##############A,,Y,Y,,,,~~.......AA###############",
+  "############A,Y,Y,T,,.,,,,~,Y,,,T,AA##############",
+  "###########A,,Y,Y,,,.,.,,~~,Y,,,,A################",
+  "##########A,,Y,.,,.,,,.,.~.,Y,,AA#################",
+  "##########A,T,.,.,,,.,.,.~.,Y,,A##################",
+  "#########A,Y,,.,.,.,,,.,.~.,Y,,A##################",
+  "#########A,Y,,.,.,.,.,.,.,~.,.,,A#################",
+  "##########A,Y,,,n,.,.,.,.~.,,,,A##################",
+  "##########AA,Y,,Y,,,.,.,.~.,,AA###################",
+  "###########AA,Y,Y,,,,,,Y,~~,AA####################",
+  "############AAAYYYYYYYYYY~YAA#####################",
+  "#################AAAAAAAA~~#######################",
+  "########################~~########################",
+  "##################################################",
+];
+
+export function generateWorld(): WorldTile[][] {
+  return worldTemplate.map((row) =>
+    row.split("").map((symbol) => symbolToTile(symbol))
+  );
 }
 
-export function generateWorld(width: number, height: number): WorldTile[][] {
-  const world: WorldTile[][] = [];
+function symbolToTile(symbol: string): WorldTile {
+  if (symbol === "#") return { type: "ocean" };
+  if (symbol === "~") return { type: "river" };
+  if (symbol === ",") return { type: "plains" };
+  if (symbol === ".") return { type: "desert" };
+  if (symbol === "Y") return { type: "forest" };
+  if (symbol === "A") return { type: "mountain" };
+  if (symbol === "T") return { type: "town" };
+  if (symbol === "n") return { type: "cave" };
 
-  for (let y = 0; y < height; y++) {
-    const row: WorldTile[] = [];
-
-    for (let x = 0; x < width; x++) {
-      const nearEdge = x < 3 || y < 3 || x > width - 4 || y > height - 4;
-
-      if (nearEdge) {
-        row.push({ type: "ocean" });
-        continue;
-      }
-
-      const roll = Math.random();
-
-      if (roll < 0.08) {
-        row.push({ type: "forest" });
-      } else if (roll < 0.13) {
-        row.push({ type: "desert" });
-      } else if (roll < 0.18) {
-        row.push({ type: "mountain" });
-      } else {
-        row.push({ type: "plains" });
-      }
-    }
-
-    world.push(row);
-  }
-
-  placeFeature(world, "town", 4);
-  placeFeature(world, "cave", 5);
-  carveRiver(world);
-
-  return world;
-}
-
-function placeFeature(world: WorldTile[][], type: WorldTile["type"], count: number): void {
-  let placed = 0;
-
-  while (placed < count) {
-    const y = Math.floor(Math.random() * world.length);
-    const x = Math.floor(Math.random() * world[0].length);
-
-    if (world[y][x].type === "plains" || world[y][x].type === "forest") {
-      world[y][x] = { type };
-      placed++;
-    }
-  }
-}
-
-function carveRiver(world: WorldTile[][]): void {
-  let x = Math.floor(world[0].length / 2);
-
-  for (let y = 3; y < world.length - 3; y++) {
-    world[y][x] = { type: "river" };
-
-    if (randomChance(0.4)) {
-      x += Math.random() < 0.5 ? -1 : 1;
-    }
-
-    x = Math.max(3, Math.min(world[0].length - 4, x));
-  }
+  return { type: "plains" };
 }

@@ -1,15 +1,82 @@
 body {
   margin: 0;
-  background: #050505;
+  background: #000000;
   color: #d6ffd6;
-  font-family: Consolas, monospace;
+  font-family: Consolas, "Courier New", monospace;
 }
 
 #app {
-  padding: 24px;
+  padding: 14px;
 }
 
-pre {
+.game-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.map-panel {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.12;
+  letter-spacing: 1px;
+  background: #000000;
+}
+
+.side-panel {
+  min-width: 430px;
+}
+
+.box {
+  margin: 0 0 10px 0;
   font-size: 18px;
   line-height: 1.25;
+  color: #dddddd;
+}
+
+.tile-player {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.tile-ocean {
+  color: #003b7a;
+  font-weight: bold;
+}
+
+.tile-river {
+  color: #35c9ff;
+  font-weight: bold;
+}
+
+.tile-plains {
+  color: #9acd32;
+}
+
+.tile-desert {
+  color: #ff9900;
+}
+
+.tile-forest {
+  color: #1f8f2e;
+  font-weight: bold;
+}
+
+.tile-mountain {
+  color: #888888;
+  font-weight: bold;
+}
+
+.tile-town {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.tile-cave {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.tile-default {
+  color: #d6ffd6;
 }
