@@ -28,12 +28,21 @@ export function scoreDice(dice: number[]): DiceResult {
     }
   }
 
-  if ((counts.get(1) ?? 0) < 3) score += (counts.get(1) ?? 0) * 100;
-  if ((counts.get(5) ?? 0) < 3) score += (counts.get(5) ?? 0) * 50;
+  if ((counts.get(1) ?? 0) < 3) {
+    score += (counts.get(1) ?? 0) * 100;
+  }
+
+  if ((counts.get(5) ?? 0) < 3) {
+    score += (counts.get(5) ?? 0) * 50;
+  }
 
   return {
     dice,
     score,
     isFarkle: score === 0,
   };
+}
+
+export function hasScoringDice(dice: number[]): boolean {
+  return scoreDice(dice).score > 0;
 }
