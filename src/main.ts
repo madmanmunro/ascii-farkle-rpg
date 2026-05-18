@@ -1,14 +1,16 @@
 import "./style.css";
+
 import { hasScoringDice, rollDice, scoreDice } from "./dice/farkle";
+import type { Encounter } from "./encounters/encounter";
 import { createPlayer } from "./player/player";
 import { renderGame } from "./ui/render";
 import {
+  createDungeonMap,
   createTownMap,
   isBlocked,
   setWorldMap,
   worldMap,
 } from "./world/world";
-import type { Encounter } from "./encounters/encounter";
 import type { WorldMode } from "./world/tile";
 
 export type ExchangeState = {
@@ -31,13 +33,20 @@ type Position = {
   y: number;
 };
 
-const app = document.querySelector<HTMLDivElement>("#app")!;
+const app = document.querySelector("#app")!;
 const player = createPlayer();
 
 let exchange: ExchangeState | null = null;
 let worldMode: WorldMode = "overworld";
+
 let overworldMap = worldMap;
 let overworldPosition = { x: player.x, y: player.y };
+
+let returnMap = worldMap;
+let returnMode: WorldMode = "overworld";
+let returnPosition = { x: player.x, y: player.y };
+
+let dungeonLevel = 1;
 
 const log: string[] = [
   "You enter a classic RPG overworld.",
@@ -82,6 +91,38 @@ function placePlayerAtSafeStart(): void {
   overworldPosition = { x: player.x, y: player.y };
 }
 
+function enterDungeon(source: "cave" | "well"): void {
+  returnMap = worldMap;
+  returnMode = worldMode;
+  returnPosition = { x: player.x, y: player.y };
+
+  setWorldMap(createDungeonMap(dungeonLevel));
+  worldMode = "dungeon";
+
+  player.x = Math.floor(worldMap[0].length / 2);
+  player.y = worldMap.length - 2;
+
+  log.push(
+    source === "cave"
+      ? "You descend into the cave dungeon."
+      : "You climb down into the well dungeon."
+  );
+
+  describeCurrentTile();
+  draw();
+}
+
+function exitDungeon(): void {
+  setWorldMap(returnMap);
+  worldMode = returnMode;
+
+  player.x = returnPosition.x;
+  player.y = returnPosition.y;
+
+  log.push("You climb back to the surface.");
+  draw();
+}
+
 function movePlayer(dx: number, dy: number): void {
   if (exchange) {
     log.push("Finish the current exchange first.");
@@ -101,12 +142,36 @@ function movePlayer(dx: number, dy: number): void {
   player.x = nextX;
   player.y = nextY;
 
+  const tile = worldMap[player.y][player.x];
+
+  if (tile.encounter) {
+    exchange = createExchange(tile.encounter);
+    log.push(`${tile.encounter.name} blocks your path. Press B after holding scoring dice.`);
+    rollForExchange();
+    return;
+  }
+
   describeCurrentTile();
   draw();
 }
 
 function describeCurrentTile(): void {
   const tile = worldMap[player.y][player.x];
+
+  if (worldMode === "dungeon" && tile.type === "exit") {
+    log.push("You see stairs leading back up. Press E to leave the dungeon.");
+    return;
+  }
+
+  if (worldMode === "dungeon" && tile.type === "stairsDown") {
+    log.push("You see stairs leading deeper. Press E to descend.");
+    return;
+  }
+
+  if (worldMode === "dungeon" && tile.type === "loot") {
+    log.push("You spot dungeon loot. Press E to collect it.");
+    return;
+  }
 
   if (tile.type === "exit") {
     log.push("You see the town exit. Press E to leave.");
@@ -163,6 +228,11 @@ function describeCurrentTile(): void {
     return;
   }
 
+  if (worldMode === "dungeon") {
+    log.push("You move through the dungeon.");
+    return;
+  }
+
   log.push("You travel across the open plains.");
 }
 
@@ -178,6 +248,7 @@ function interactWithTile(): void {
   if (worldMode === "overworld" && tile.type === "town") {
     overworldPosition = { x: player.x, y: player.y };
     overworldMap = worldMap;
+
     setWorldMap(createTownMap());
     worldMode = "town";
 
@@ -214,8 +285,7 @@ function interactWithTile(): void {
   }
 
   if (worldMode === "town" && tile.type === "well") {
-    log.push("You peer into the well. Dungeon descent will connect here next.");
-    draw();
+    enterDungeon("well");
     return;
   }
 
@@ -226,7 +296,35 @@ function interactWithTile(): void {
   }
 
   if (worldMode === "overworld" && tile.type === "cave") {
-    log.push("Dungeon crawler system coming next.");
+    enterDungeon("cave");
+    return;
+  }
+
+  if (worldMode === "dungeon" && tile.type === "exit") {
+    exitDungeon();
+    return;
+  }
+
+  if (worldMode === "dungeon" && tile.type === "loot") {
+    const goldFound = 5 + Math.floor(Math.random() * 16);
+
+    player.gold += goldFound;
+    tile.type = "floor";
+
+    log.push(`You find dungeon loot worth ${goldFound} gold.`);
+    draw();
+    return;
+  }
+
+  if (worldMode === "dungeon" && tile.type === "stairsDown") {
+    dungeonLevel += 1;
+
+    setWorldMap(createDungeonMap(dungeonLevel));
+
+    player.x = Math.floor(worldMap[0].length / 2);
+    player.y = worldMap.length - 2;
+
+    log.push(`You descend to dungeon level ${dungeonLevel}.`);
     draw();
     return;
   }
@@ -267,7 +365,7 @@ function rollForExchange(): void {
   log.push(
     `Rolled: ${exchange.currentRoll
       .map((die, index) => `${index + 1}:${die}`)
-      .join("  ")}`
+      .join(" ")}`
   );
 
   log.push("Choose dice with number keys, then press B to bank.");
@@ -279,17 +377,12 @@ function toggleHeldDie(index: number): void {
   if (index < 0 || index >= exchange.currentRoll.length) return;
 
   if (exchange.heldIndexes.includes(index)) {
-    exchange.heldIndexes = exchange.heldIndexes.filter(
-      (heldIndex) => heldIndex !== index
-    );
+    exchange.heldIndexes = exchange.heldIndexes.filter((heldIndex) => heldIndex !== index);
   } else {
     exchange.heldIndexes.push(index);
   }
 
-  exchange.heldDice = exchange.heldIndexes.map(
-    (heldIndex) => exchange!.currentRoll[heldIndex]
-  );
-
+  exchange.heldDice = exchange.heldIndexes.map((heldIndex) => exchange!.currentRoll[heldIndex]);
   draw();
 }
 
@@ -313,9 +406,7 @@ function bankHeldDice(): void {
   exchange.bankedScore += heldResult.score;
   exchange.diceRemaining -= exchange.heldDice.length;
 
-  log.push(
-    `Banked ${heldResult.score}. Total: ${exchange.bankedScore}/${exchange.threshold}.`
-  );
+  log.push(`Banked ${heldResult.score}. Total: ${exchange.bankedScore}/${exchange.threshold}.`);
 
   if (exchange.bankedScore >= exchange.threshold) {
     winExchange();
@@ -347,6 +438,7 @@ function winExchange(): void {
 
   tile.encounter = undefined;
   exchange = null;
+
   draw();
 }
 

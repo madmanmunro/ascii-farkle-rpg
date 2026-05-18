@@ -1,4 +1,5 @@
 import type { WorldTile } from "./tile";
+import { generateDungeon } from "./generateDungeon";
 import { generateTown } from "./generateTown";
 import { generateWorld } from "./generateWorld";
 
@@ -10,6 +11,10 @@ export function setWorldMap(newMap: WorldTile[][]): void {
 
 export function createTownMap(): WorldTile[][] {
   return generateTown(20, 12);
+}
+
+export function createDungeonMap(level = 1): WorldTile[][] {
+  return generateDungeon(30, 16, level);
 }
 
 export function createOverworldMap(): WorldTile[][] {
@@ -25,6 +30,8 @@ export function isBlocked(x: number, y: number): boolean {
 }
 
 export function getTileSymbol(tile: WorldTile): string {
+  if (tile.encounter) return "M";
+
   if (tile.type === "ocean") return "#";
   if (tile.type === "river") return "~";
   if (tile.type === "plains") return ",";
@@ -35,7 +42,7 @@ export function getTileSymbol(tile: WorldTile): string {
   if (tile.type === "cave") return "n";
   if (tile.type === "road") return "=";
   if (tile.type === "wall") return "#";
-  if (tile.type === "floor") return ",";
+  if (tile.type === "floor") return ".";
   if (tile.type === "building") return "B";
   if (tile.type === "tavern") return "t";
   if (tile.type === "trader") return "$";
